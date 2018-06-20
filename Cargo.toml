@@ -1,0 +1,16 @@
+[package]
+name = "cli"
+version = "0.1.0"
+authors = ["nickfierro <nickfierro@gmail.com>"]
+
+[dependencies]
+docopt = "0.9"
+serde = "1.0" # if you're using `derive(Deserialize)`
+serde_json = "1.0"
+serde_derive = "1.0" # if you're using `derive(Deserialize)`
+toml = "0.4.2"
+mimir-crypto = { git = "https://github.com/mimirblockchainsolutions/mimir-bridge-alpha.git", branch = "refactor" }
+mimir-common = { git = "https://github.com/mimirblockchainsolutions/mimir-bridge-alpha.git", branch = "refactor" }
+rand = "0.4.2"
+rlp = "0.2.1"
+reqwest = "0.8.6"

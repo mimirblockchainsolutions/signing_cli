@@ -9,6 +9,8 @@ extern crate rand;
 extern crate toml;
 extern crate rlp;
 extern crate reqwest;
+extern crate ring;
+extern crate crypto;
 
 mod transact;
 
@@ -18,46 +20,22 @@ use mimir_crypto::secp256k1::Signer;
 use mimir_crypto::secp256k1::Public;
 use mimir_crypto::secp256k1::Secret;
 use mimir_crypto::secp256k1::Address;
-use mimir_common::types::{Bytes, U256};
+use mimir_crypto::keccak256::Keccak256;
+use mimir_common::types::{Bytes, U256, H256};
 use std::fs;
 use serde_json::Value;
 use reqwest::Client;
 use docopt::Docopt;
+use crypto::symmetriccipher::Decryptor;
+use crypto::blockmodes::CtrMode;
+use crypto::aessafe::AesSafe128Encryptor;
+use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
 
 
 /// get signer for parity dev chain
 fn dev_signer() -> Signer {
     let dev_secret = mimir_crypto::secp256k1::dev::SECRET;
     Signer::new(dev_secret).expect("dev secret always valid")
-}
-
-
-const USAGE: &'static str = r#"
-Mimir-Crypto cli
-           ____
-          /\   \
-         /  \___\
-        _\  / __/_
-       /\ \/_/\   \
-      /  \__/  \___\
-     _\  /  \  / __/_
-    /\ \/___/\/_/\   \
-   /  \___\    /  \___\
-  _\  /   /_  _\__/ __/_
- /\ \/___/  \/\   \/\   \
-/  \___\ \___\ \___\ \___\
-\  /   / /   / /   / /   /
- \/___/\/___/\/___/\/___/
-
-Usage:
-crypto-cli keygen
-crypto-cli test
-"#;
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    cmd_keygen: bool,
-    cmd_test: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,10 +60,79 @@ fn store_keys(keys: Keys) -> Result<(), Error> {
     Ok(())
 }
 
-fn retrieve_keys() -> Result<Keys, Error> {
+fn retrieve_keys_toml() -> Result<Keys, Error> {
     let read = fs::read_to_string("keys.toml")?;
     let toml: Keys = toml::from_str(&read)?;
     Ok(toml)
+}
+
+#[derive(Deserialize, Debug)]
+struct Wallet {
+    crypto: Crypto,
+}
+
+#[derive(Deserialize, Debug)]
+struct Crypto {
+    ciphertext: H256,
+    cipherparams: Cypherparams,
+    kdf: String,
+    kdfparams: Kdfparams,
+    mac: H256,
+}
+
+#[derive(Deserialize, Debug)]
+struct Cypherparams {
+    iv: Bytes,
+}
+
+#[derive(Deserialize, Debug)]
+struct Kdfparams {
+    c: u32,
+    dklen: u32,
+    prf: String,
+    salt: H256,
+}
+
+fn retrieve_keys_json(path: &str) -> Result<Wallet, Error> {
+    let read = fs::read_to_string(path)?;
+    let wallet: Wallet = serde_json::from_str(&read)?;
+    Ok(wallet)
+}
+
+fn decrypt_wallet(wallet: Wallet, password: &str) -> Result<Secret, Error> {
+    let mut derived_key = [0u8; 32];
+    ring::pbkdf2::derive(
+        &ring::digest::SHA256,
+        wallet.crypto.kdfparams.c,
+        &wallet.crypto.kdfparams.salt,
+        password.as_ref(),
+        &mut derived_key[..],
+    );
+    let right_bits = &derived_key[0..16];
+    let left_bits = &derived_key[16..32];
+    right_bits.to_vec();
+    left_bits.to_vec();
+
+    let mut mac_buff = vec![0u8; 16 + wallet.crypto.ciphertext.len()];
+    mac_buff[0..16].copy_from_slice(left_bits);
+    mac_buff[16..wallet.crypto.ciphertext.len() + 16].copy_from_slice(&wallet.crypto.ciphertext);
+
+    let mac = Keccak256::hash(&mac_buff);
+
+    assert_eq!(&mac, &*wallet.crypto.mac);
+    let mut encryptor = CtrMode::new(
+        AesSafe128Encryptor::new(&left_bits),
+        wallet.crypto.cipherparams.iv.into(),
+    );
+    let mut decrypted = [0u8; 32];
+    encryptor
+        .decrypt(
+            &mut RefReadBuffer::new(&wallet.crypto.ciphertext),
+            &mut RefWriteBuffer::new(&mut decrypted),
+            true,
+        )
+        .map_err(|err| Error::message("decryption failed"))?;
+    Ok(decrypted.into())
 }
 
 fn create_signer(keys: Keys) -> Result<Signer, Error> {
@@ -255,6 +302,38 @@ where
 }
 
 // ---------------------------------------->  main
+const USAGE: &'static str = r#"
+Mimir-Crypto cli
+           ____
+          /\   \
+         /  \___\
+        _\  / __/_
+       /\ \/_/\   \
+      /  \__/  \___\
+     _\  /  \  / __/_
+    /\ \/___/\/_/\   \
+   /  \___\    /  \___\
+  _\  /   /_  _\__/ __/_
+ /\ \/___/  \/\   \/\   \
+/  \___\ \___\ \___\ \___\
+\  /   / /   / /   / /   /
+ \/___/\/___/\/___/\/___/
+
+Usage:
+crypto-cli keygen
+crypto-cli test
+crypto-cli decrypt <file> <password>
+"#;
+
+#[derive(Debug, Deserialize)]
+struct Args {
+    arg_file: String,
+    arg_password: String,
+    cmd_keygen: bool,
+    cmd_test: bool,
+    cmd_decrypt: bool,
+}
+
 fn main() {
     println!("{}", USAGE);
     let args: Args = Docopt::new(USAGE)
@@ -262,18 +341,14 @@ fn main() {
         .unwrap_or_else(|e| e.exit());
 
     if args.cmd_keygen == true {
-        let keys = retrieve_keys();
-        match keys {
-            Ok(t) => println!("{:?}", t),
-            Err(e) => println!("{:?}", e),
-        }
+        let keys = keygen();
     // store_keys(keygen()).unwrap()
     } else if args.cmd_test {
-        let result = testimate();
-        match result {
-            Ok(price) => println!("{:?}",price),
-            Err(err) => println!("{:?}", err),
-        }
+        let wallet = retrieve_keys_json("keys.json").unwrap();
+        let decrypted = decrypt_wallet(wallet, "").unwrap();
+        println!("{:?}", decrypted);
+    } else if args.cmd_decrypt == true {
+        println!("You're trying to decrypt");
     } else {
         println!("Something is wrong with keygen");
     }

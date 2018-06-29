@@ -1,0 +1,22 @@
+{
+  "id":"95bf782e-1869-798c-cfd2-00f9d5cba96b",
+  "version":3,
+  "crypto": {
+    "cipher":"aes-128-ctr",
+    "cipherparams": {
+      "iv":"909071c74f3b7b8966c8153df61f57d5"
+      },
+    "ciphertext":"fccb76c5f8bc94f29d03dba62f44c13dccc7af5f2db2ce672108621f1feba4a9",
+    "kdf":"pbkdf2",
+    "kdfparams": {
+      "c":10240,
+      "dklen":32,
+      "prf":"hmac-sha256",
+      "salt":"344780c5693ac9f8ec80103c4c46eeae39bcc3d845bf6949316d65938fd66a18"
+      },
+    "mac":"0e5864b75d4ac8e54da619a51c24cd1761c705067f5e913284805ce5a478e64b"
+    },
+  "address":"00a329c0648769a73afac7f9381e08fb43dbea72",
+  "name":"Development Account",
+  "meta":"{\"description\":\"Never use this account outside of development chain!\",\"passwordHint\":\"Password is empty string\"}"
+}

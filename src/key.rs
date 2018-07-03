@@ -12,7 +12,7 @@ use rand;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Keys {
     public: Public,
-    secret: Secret,
+    pub secret: Secret,
     address: Address,
 }
 
@@ -88,6 +88,10 @@ pub fn decrypt_wallet(wallet: Wallet, password: String) -> Result<Secret, Error>
     Ok(decrypted.into())
 }
 
-fn create_signer(keys: Keys) -> Result<Signer, Error> {
+pub fn create_signer(secret: Secret) -> Result<Signer, Error> {
+    Signer::new(secret).map_err(|err| err.into())
+}
+
+pub fn keys_to_signer(keys: Keys) -> Result<Signer, Error> {
     Signer::new(keys.secret).map_err(|err| err.into())
 }

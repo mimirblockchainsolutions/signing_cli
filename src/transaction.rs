@@ -11,7 +11,7 @@ macro_rules! opt_slice {
     }
 }
 
-fn build_transaction(
+pub fn build_transaction(
     signer: Signer,
     nonce: Option<U256>,
     gas_price: Option<U256>,

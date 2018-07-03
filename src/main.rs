@@ -3,6 +3,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate docopt;
+#[macro_use]
+extern crate structopt;
 extern crate mimir_crypto;
 extern crate mimir_common;
 extern crate rand;
@@ -17,10 +19,12 @@ mod store;
 mod error;
 mod key;
 
-use docopt::Docopt;
+use structopt::StructOpt;
+use mimir_common::types::{Bytes, U256};
+use mimir_crypto::secp256k1::Address;
+
 // ---------------------------------------->  main
-const USAGE: &'static str = r#"
-Mimir-Crypto cli
+const MIMIR: &'static str = r#"
            ____
           /\   \
          /  \___\
@@ -36,38 +40,103 @@ Mimir-Crypto cli
 \  /   / /   / /   / /   /
  \/___/\/___/\/___/\/___/
 
-Usage:
-crypto-cli keygen
-crypto-cli test
-crypto-cli decrypt <file> <password>
 "#;
 
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_file: String,
-    arg_password: String,
-    cmd_keygen: bool,
-    cmd_test: bool,
-    cmd_decrypt: bool,
+/// Mimir crypto cli
+#[derive(Debug, StructOpt)]
+#[structopt(name = "crypto-cli")]
+enum Opt {
+    ///generate a new key
+    #[structopt(name = "keygen")]
+    KeyGen,
+    /// run a test
+    #[structopt(name = "test")]
+    Test,
+    /// decrypt a key file
+    #[structopt(name = "decrypt")]
+    Decrypt {
+        /// path to key file
+        keyfile: String,
+        /// password for key file
+        password: String,
+    },
+    /// build a transaction and signs it
+    #[structopt(name = "new")]
+    Transaction {
+        /// path to key file
+        keyfile: String,
+        /// password for key file
+        password: String,
+        /// address to send to
+        #[structopt(short = "t", long = "to")]
+        to: Option<Address>,
+        /// nonce of the account
+        #[structopt(short = "o", long = "nonce")]
+        nonce: Option<U256>,
+        /// value of the Transaction
+        #[structopt(short = "v", long = "value")]
+        value: Option<U256>,
+        /// data to send with the Transaction
+        #[structopt(short = "c", long = "calldata")]
+        calldata: Option<Bytes>,
+        /// price of gas
+        #[structopt(short = "p", long = "gasprice")]
+        gasprice: Option<U256>,
+        /// gas limit
+        #[structopt(short = "l", long = "gaslimit")]
+        gaslimit: Option<U256>,
+    },
 }
 
 fn main() {
-    println!("{}", USAGE);
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.deserialize())
-        .unwrap_or_else(|e| e.exit());
-
-    if args.cmd_keygen == true {
-        let _keys = key::keygen();
-    // store_keys(keygen()).unwrap()
-    } else if args.cmd_test {
-        println!{"Test!"};
-    } else if args.cmd_decrypt == true {
-        let wallet = store::retrieve_keys_json(&args.arg_file).unwrap();
-        let decrypted = key::decrypt_wallet(wallet, args.arg_password).unwrap();
-        println!("{:?}", decrypted);
-    } else {
-        println!("Something is wrong with keygen");
+    println!("{}", MIMIR);
+    let opt = Opt::from_args();
+    println!("options: {:?}", opt);
+    match opt {
+        Opt::KeyGen => {
+            let _keys = key::keygen();
+            store::store_keys(key::keygen()).unwrap()
+        }
+        Opt::Test => {
+            println!{"Test!"};
+        }
+        Opt::Decrypt { keyfile, password } => {
+            let wallet = store::retrieve_keys_json(&keyfile).unwrap();
+            let decrypted = key::decrypt_wallet(wallet, password).unwrap();
+            println!("{:?}", decrypted);
+        }
+        Opt::Transaction {
+            keyfile,
+            password,
+            to,
+            nonce,
+            value,
+            calldata,
+            gasprice,
+            gaslimit,
+        } => {
+            let signer;
+            if keyfile.contains(".json") {
+                let wallet = store::retrieve_keys_json(&keyfile).unwrap();
+                let decrypted = key::decrypt_wallet(wallet, password).unwrap();
+                signer = key::create_signer(decrypted).unwrap()
+            } else if keyfile.contains(".toml") {
+                let key = store::retrieve_keys_toml(&keyfile).unwrap();
+                signer = key::create_signer(key.secret).unwrap()
+            } else {
+                panic!("Key file not supported");
+            }
+            let transaction = transaction::build_transaction(
+                signer,
+                nonce,
+                gasprice,
+                gaslimit,
+                to,
+                value,
+                calldata,
+            );
+            println!("{:?}", transaction);
+        }
     }
 }
 //-------------------------------------------

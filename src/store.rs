@@ -4,13 +4,13 @@ use toml;
 use serde_json;
 use std::fs;
 
-fn store_keys(keys: Keys) -> Result<(), Error> {
+pub fn store_keys(keys: Keys) -> Result<(), Error> {
     let toml = toml::to_string(&keys)?;
     fs::write("keys.toml", toml)?;
     Ok(())
 }
 
-fn retrieve_keys_toml(path: &str) -> Result<Keys, Error> {
+pub fn retrieve_keys_toml(path: &str) -> Result<Keys, Error> {
     let read = fs::read_to_string(path)?;
     let toml: Keys = toml::from_str(&read)?;
     Ok(toml)

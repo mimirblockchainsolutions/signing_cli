@@ -2,7 +2,6 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate docopt;
 #[macro_use]
 extern crate structopt;
 extern crate mimir_crypto;
@@ -39,7 +38,7 @@ const MIMIR: &'static str = r#"
 /  \___\ \___\ \___\ \___\
 \  /   / /   / /   / /   /
  \/___/\/___/\/___/\/___/
-
+v0.0.1
 "#;
 
 /// Mimir crypto cli
@@ -94,10 +93,11 @@ fn main() {
     println!("options: {:?}", opt);
     match opt {
         Opt::KeyGen => {
-            let _keys = key::keygen();
-            store::store_keys(key::keygen()).unwrap()
+            let keys = key::keygen();
+            store::store_keys(keys).unwrap();
         }
         Opt::Test => {
+            // do some test stuff
             println!{"Test!"};
         }
         Opt::Decrypt { keyfile, password } => {
@@ -135,7 +135,7 @@ fn main() {
                 value,
                 calldata,
             );
-            println!("{:?}", transaction);
+            println!("Transaction: {:?}", transaction);
         }
     }
 }

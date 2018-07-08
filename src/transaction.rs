@@ -10,7 +10,7 @@ macro_rules! opt_slice {
         $opt.as_ref().map(|val| val.as_ref())
     }
 }
-
+// try some stuff with the optional fields like get them, guess or infer
 pub fn build_transaction(
     signer: Signer,
     nonce: Option<U256>,

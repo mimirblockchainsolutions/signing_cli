@@ -1,7 +1,6 @@
 Offline signing utility
 
-cargo run:
-  keygen
-  test
-  decrypt <keyfile> <password>
-  transaction <keyfile> <password> <to> <nonce> <value> <calldata> <gasprice> <gaslimit>
+`cargo run  keygen`
+`cargo run  test`
+`cargo run  decrypt <keyfile> <password>``
+`cargo run  transaction <keyfile> <password> <to> <nonce> <value> <calldata> <gasprice> <gaslimit>`

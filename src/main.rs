@@ -136,6 +136,7 @@ fn main() {
                 calldata,
             );
             println!("Transaction: {:?}", transaction);
+            transaction::send_transaction(transaction).unwrap();
         }
     }
 }

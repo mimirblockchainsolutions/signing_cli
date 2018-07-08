@@ -32,7 +32,7 @@ pub fn build_transaction(
     calldata.into()
 }
 
-fn send_transaction(signed: Bytes) -> Result<Value, Error> {
+pub fn send_transaction(signed: Bytes) -> Result<Value, Error> {
     let rpc = json!({
         "method": "eth_sendRawTransaction",
         "params": [signed],

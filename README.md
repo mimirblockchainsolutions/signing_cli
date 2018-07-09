@@ -11,4 +11,5 @@ This tool can be used to build and sign transactions offline to be sent to a net
 `cargo run  decrypt <keyfile> <password>`
 
 If you have a node running, the program will try and infer nonce, gasprice, and gaslimit.
+
 `cargo run  transaction <keyfile> <password> <to> [<nonce> <value> <calldata> <gasprice> <gaslimit>]`

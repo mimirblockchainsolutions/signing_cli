@@ -13,19 +13,19 @@ macro_rules! opt_slice {
 // try some stuff with the optional fields like get them, guess or infer
 pub fn build_transaction(
     signer: Signer,
-    nonce: Option<U256>,
-    gas_price: Option<U256>,
-    gas_limit: Option<U256>,
-    to: Option<Address>,
+    nonce: U256,
+    gas_price: U256,
+    gas_limit: U256,
+    to: Address,
     value: Option<U256>,
     data: Option<Bytes>,
 ) -> Bytes {
     let calldata = RawTxBuilder {
         signer: signer,
-        nonce: opt_slice!(nonce),
-        gas_price: opt_slice!(gas_price),
-        gas_limit: opt_slice!(gas_limit),
-        to: opt_slice!(to),
+        nonce: Some(&nonce),
+        gas_price: Some(&gas_price),
+        gas_limit: Some(&gas_limit),
+        to: Some(&to),
         value: opt_slice!(value),
         data: opt_slice!(data),
     }.finish();
@@ -45,18 +45,35 @@ pub fn send_transaction(signed: Bytes) -> Result<Value, Error> {
     Ok(rsp_json)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct EstimateTx {
-    to: Address,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    from: Option<Address>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<U256>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<Bytes>,
+pub fn get_nonce(addr: Address) -> Result<U256, Error> {
+    let rpc = json!({
+        "method": "eth_getTransactionCount",
+        "params": [addr, "latest"],
+        "id": 0,
+        "jsonrpc": "2.0"
+    });
+    let client = reqwest::Client::new();
+    let mut res = client.post("http://127.0.0.1:8545").json(&rpc).send()?;
+    let rslt: JsonResult<U256> = res.json()?;
+    Ok(rslt.result)
 }
 
-fn estimate_gas_cost(tx: EstimateTx) -> Result<U256, Error> {
+#[derive(Debug, Serialize, Deserialize)]
+struct JsonResult<T> {
+    result: T,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EstimateTx {
+    pub to: Address,
+    pub from: Address,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<U256>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<Bytes>,
+}
+
+pub fn estimate_gas_cost(tx: EstimateTx) -> Result<U256, Error> {
     let rpc = json!({
         "method": "eth_estimateGas",
         "params": [tx],
@@ -75,7 +92,7 @@ fn estimate_gas_cost(tx: EstimateTx) -> Result<U256, Error> {
     }
 }
 
-fn get_gas_price() -> Result<U256, Error> {
+pub fn get_gas_price() -> Result<U256, Error> {
     let rpc = json!({
         "method": "eth_gasPrice",
         "id": 0,

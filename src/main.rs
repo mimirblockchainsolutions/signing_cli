@@ -68,7 +68,7 @@ enum Opt {
         password: String,
         /// address to send to
         #[structopt(short = "t", long = "to")]
-        to: Option<Address>,
+        to: Address,
         /// nonce of the account
         #[structopt(short = "o", long = "nonce")]
         nonce: Option<U256>,
@@ -125,16 +125,28 @@ fn main() {
                 signer = key::create_signer(key.secret).unwrap()
             } else {
                 panic!("Key file not supported");
-            }
-            let transaction = transaction::build_transaction(
-                signer,
-                nonce,
-                gasprice,
-                gaslimit,
-                to,
-                value,
-                calldata,
-            );
+            };
+            let n = match nonce {
+                Some(n) => n,
+                None => transaction::get_nonce(signer.address()).unwrap(),
+            };
+            let gp = match gasprice {
+                Some(gp) => gp,
+                None => transaction::get_gas_price().unwrap(),
+            };
+            let gl = match gaslimit {
+                Some(gl) => gl,
+                None => {
+                    transaction::estimate_gas_cost(transaction::EstimateTx {
+                        to: to,
+                        from: signer.address(),
+                        value: value,
+                        data: calldata.clone(),
+                    }).unwrap()
+                }
+            };
+            let transaction =
+                transaction::build_transaction(signer, n, gp, gl, to, value, calldata);
             println!("Transaction: {:?}", transaction);
             transaction::send_transaction(transaction).unwrap();
         }
